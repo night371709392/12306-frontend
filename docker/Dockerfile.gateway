@@ -1,0 +1,12 @@
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY index12306-gateway-service.jar /app/
+EXPOSE 9000
+ENTRYPOINT ["java", \
+  "-Xms256m", "-Xmx512m", \
+  "-XX:+UseG1GC", \
+  "-XX:MaxGCPauseMillis=200", \
+  "-jar", "/app/index12306-gateway-service.jar", \
+  "--spring.cloud.nacos.discovery.username=nacos", \
+  "--spring.cloud.nacos.discovery.password=nacos", \
+  "--spring.cloud.nacos.discovery.server-addr=nacos:8848"]

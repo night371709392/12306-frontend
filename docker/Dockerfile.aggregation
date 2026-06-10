@@ -1,0 +1,18 @@
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY index12306-aggregation-service.jar /app/
+COPY shardingsphere-config-docker.yaml /app/
+EXPOSE 9005
+ENTRYPOINT ["java", \
+  "-Xms512m", "-Xmx1024m", \
+  "-XX:+UseG1GC", \
+  "-XX:MaxGCPauseMillis=200", \
+  "-jar", "/app/index12306-aggregation-service.jar", \
+  "--spring.datasource.url=jdbc:shardingsphere:absolutepath:/app/shardingsphere-config-docker.yaml", \
+  "--spring.cloud.nacos.discovery.username=nacos", \
+  "--spring.cloud.nacos.discovery.password=nacos", \
+  "--spring.cloud.nacos.discovery.server-addr=nacos:8848", \
+  "--spring.data.redis.host=redis", \
+  "--spring.data.redis.password=123456", \
+  "--rocketmq.name-server=rocketmq-namesrv:9876", \
+  "--spring.cloud.sentinel.transport.dashboard=sentinel:8080"]

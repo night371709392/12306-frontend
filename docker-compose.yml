@@ -1,0 +1,153 @@
+version: "3.8"
+
+services:
+  # ── Middleware ──
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ljh123456
+    ports:
+      - "3306:3306"
+    volumes:
+      - /root/mysql/data:/var/lib/mysql
+      - /root/mysql/conf:/etc/mysql/conf.d
+    restart: unless-stopped
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2
+    container_name: redis
+    command: redis-server --requirepass 123456
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "123456", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: nacos
+    environment:
+      MODE: standalone
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    restart: unless-stopped
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://127.0.0.1:8848/nacos/v1/console/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.1.4
+    container_name: rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    restart: unless-stopped
+    networks:
+      - net
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.1.4
+    container_name: rocketmq-broker
+    command: sh mqbroker -n rocketmq-namesrv:9876 --autoCreateTopicEnable=true
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    depends_on:
+      - rocketmq-namesrv
+    restart: unless-stopped
+    networks:
+      - net
+
+  sentinel:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: sentinel
+    ports:
+      - "8686:8080"
+    restart: unless-stopped
+    networks:
+      - net
+
+  # ── Java services ──
+
+  aggregation:
+    build:
+      context: ./12306
+      dockerfile: Dockerfile.aggregation
+    container_name: aggregation
+    ports:
+      - "9005:9005"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://127.0.0.1:9005/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  gateway:
+    build:
+      context: ./12306
+      dockerfile: Dockerfile.gateway
+    container_name: gateway
+    ports:
+      - "9000:9000"
+    depends_on:
+      aggregation:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://127.0.0.1:9000/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ── Nginx reverse proxy ──
+
+  nginx-proxy:
+    build:
+      context: ./nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    networks:
+      - net
+
+networks:
+  net:
+    driver: bridge
