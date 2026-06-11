@@ -29,7 +29,7 @@
             </div>
             <div class="order-card__info">
               <span class="dim" style="font-size:0.72rem">{{ o.departureTime }} / {{ o.departureDate || '--' }}</span>
-              <span class="mono" style="margin-left:auto">¥{{ o.totalAmount || o.amount || 0 }}</span>
+              <span class="mono" style="margin-left:auto">¥{{ yuan(o.totalAmount ?? o.amount) }}</span>
             </div>
           </div>
           <div class="order-card__actions">
@@ -66,6 +66,8 @@
 import { ref, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { getOrderPage, cancelTicket, refundTicket } from '@/api'
+
+const yuan = (fen) => ((Number(fen) || 0) / 100).toFixed(2)
 
 const tabs = [
   { value: 0, label: '未支付' },

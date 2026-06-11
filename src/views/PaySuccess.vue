@@ -47,6 +47,8 @@ const departure = ref(route.query.departure || '')
 const arrival = ref(route.query.arrival || '')
 const amount = ref(route.query.amount || '')
 
+const yuan = (fen) => ((Number(fen) || 0) / 100).toFixed(2)
+
 onMounted(async () => {
   if (orderSn.value && !trainNumber.value) {
     try {
@@ -55,7 +57,8 @@ onMounted(async () => {
         trainNumber.value = res.data.trainNumber || ''
         departure.value = res.data.departure || ''
         arrival.value = res.data.arrival || ''
-        amount.value = res.data.totalAmount || res.data.amount || ''
+        const totalFen = (res.data.passengerDetails || []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+        amount.value = totalFen ? yuan(totalFen) : ''
       }
     } catch {}
   }

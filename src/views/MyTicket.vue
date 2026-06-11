@@ -26,7 +26,7 @@
           </div>
           <div class="ticket-card__meta">
             <span class="dim" style="font-size:0.7rem">{{ t.departureDate || '--' }}</span>
-            <span class="mono" style="margin-left:auto">¥{{ t.totalAmount || t.amount || 0 }}</span>
+            <span class="mono" style="margin-left:auto">¥{{ yuan(t.totalAmount ?? t.amount) }}</span>
           </div>
           <div class="ticket-card__actions">
             <router-link :to="`/order?orderSn=${t.orderSn}`" class="action-link">查看详情</router-link>
@@ -51,6 +51,8 @@
 import { ref, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { getMyTickets } from '@/api'
+
+const yuan = (fen) => ((Number(fen) || 0) / 100).toFixed(2)
 
 const tickets = ref([])
 const loading = ref(false)

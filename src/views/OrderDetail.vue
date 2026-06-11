@@ -45,14 +45,14 @@
           <div v-for="p in passengers" :key="p.id" class="pax-row">
             <span>{{ p.realName }}</span>
             <span class="dim mono" style="font-size:0.72rem">{{ p.idCard }}</span>
-            <span class="mono dim" style="margin-left:auto">¥{{ p.amount || 0 }}</span>
+            <span class="mono dim" style="margin-left:auto">¥{{ yuan(p.amount) }}</span>
           </div>
         </div>
 
         <!-- Total -->
-        <div class="total-bar glass" v-if="order.totalAmount">
+        <div class="total-bar glass" v-if="totalAmountFen">
           <span>合计</span>
-          <span class="mono" style="font-size:1.3rem;font-weight:600">¥{{ order.totalAmount }}</span>
+          <span class="mono" style="font-size:1.3rem;font-weight:600">¥{{ yuan(totalAmountFen) }}</span>
         </div>
 
         <!-- Actions -->
@@ -81,7 +81,7 @@
               </div>
             </div>
             <button class="pay-btn" @click="doPay" :disabled="paying" style="width:100%;margin-top:var(--s-lg)">
-              ¥{{ order.totalAmount }} 确认支付
+              ¥{{ yuan(totalAmountFen) }} 确认支付
             </button>
             <button class="cancel-btn" @click="showPayModal = false" style="width:100%;margin-top:var(--s-sm)">关闭</button>
           </div>
@@ -116,6 +116,13 @@ const payChannels = [
 ]
 
 const statusMap = { 0:'待支付', 10:'已支付', 20:'已进站', 30:'已取消', 40:'已退票', 50:'已改签' }
+
+// Backend amounts are in cents (分). Convert to yuan for display.
+const yuan = (fen) => ((Number(fen) || 0) / 100).toFixed(2)
+// Order detail has no top-level total; sum the per-passenger amounts (in cents).
+const totalAmountFen = computed(() =>
+  passengers.value.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+)
 const statusClass = computed(() => {
   const s = order.value?.status
   if (s === 0) return 'status-badge--amber'
@@ -172,7 +179,7 @@ async function doPay() {
       channel: payChannel.value,
       tradeType: 0,
       orderSn: order.value.orderSn,
-      totalAmount: order.value.totalAmount,
+      totalAmount: totalAmountFen.value,
       outOrderSn: order.value.orderSn,
       subject: '12306火车票'
     })
