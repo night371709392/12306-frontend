@@ -25,8 +25,8 @@
             </div>
           </div>
           <div class="ticket-card__meta">
-            <span class="dim" style="font-size:0.7rem">{{ t.departureDate || '--' }}</span>
-            <span class="mono" style="margin-left:auto">¥{{ yuan(t.totalAmount ?? t.amount) }}</span>
+            <span class="dim" style="font-size:0.7rem">{{ t.ridingDate || '--' }}</span>
+            <span class="mono" style="margin-left:auto">¥{{ yuan(t.amountFen) }}</span>
           </div>
           <div class="ticket-card__actions">
             <router-link :to="`/order?orderSn=${t.orderSn}`" class="action-link">查看详情</router-link>
@@ -74,7 +74,13 @@ async function fetchTickets() {
   try {
     const res = await getMyTickets({ current: page.value, size: pageSize })
     if (res.success && res.data) {
-      tickets.value = res.data.records || []
+      // Status and amount live inside passengerDetails, not at the top level. Flatten them.
+      tickets.value = (res.data.records || []).map(t => {
+        const pax = t.passengerDetails || []
+        const amountFen = pax.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+        const status = pax.length ? pax[0].status : t.status
+        return { ...t, status, amountFen, ridingDate: t.ridingDate || t.departureDate }
+      })
       total.value = res.data.total || 0
     }
   } catch {} finally { loading.value = false }

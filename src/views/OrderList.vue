@@ -28,8 +28,8 @@
               <span class="dim" style="font-size:0.72rem">{{ o.departure }} → {{ o.arrival }}</span>
             </div>
             <div class="order-card__info">
-              <span class="dim" style="font-size:0.72rem">{{ o.departureTime }} / {{ o.departureDate || '--' }}</span>
-              <span class="mono" style="margin-left:auto">¥{{ yuan(o.totalAmount ?? o.amount) }}</span>
+              <span class="dim" style="font-size:0.72rem">{{ o.departureTime }} / {{ o.ridingDate || '--' }}</span>
+              <span class="mono" style="margin-left:auto">¥{{ yuan(o.amountFen) }}</span>
             </div>
           </div>
           <div class="order-card__actions">
@@ -96,7 +96,13 @@ async function fetchOrders() {
   try {
     const res = await getOrderPage({ userId, current: page.value, size: pageSize, statusType: activeTab.value })
     if (res.success && res.data) {
-      orders.value = res.data.records || []
+      // Status and amount live inside passengerDetails, not at the top level. Flatten them.
+      orders.value = (res.data.records || []).map(o => {
+        const pax = o.passengerDetails || []
+        const amountFen = pax.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+        const status = pax.length ? pax[0].status : o.status
+        return { ...o, status, amountFen, ridingDate: o.ridingDate || o.departureDate }
+      })
       total.value = res.data.total || 0
     }
   } catch {} finally { loading.value = false }

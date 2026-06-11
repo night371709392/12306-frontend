@@ -156,7 +156,11 @@ onMounted(async () => {
     if (res.success && res.data) {
       order.value = res.data
       if (res.data.passengerDetails) passengers.value = res.data.passengerDetails
-      if (res.data.status === 0) startCountdown(600)
+      // Status lives inside passengerDetails, not at the top level. Surface it.
+      if (order.value.status == null && passengers.value.length) {
+        order.value.status = passengers.value[0].status
+      }
+      if (order.value.status === 0) startCountdown(600)
     }
   } catch {} finally { loading.value = false }
 })
