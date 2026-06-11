@@ -203,10 +203,17 @@ function swapStations() {
 }
 
 // Date
-const today = computed(() => new Date().toISOString().slice(0, 10))
+// 使用本地时区格式化为 YYYY-MM-DD，避免 toISOString() 按 UTC 导致日期偏差（如北京凌晨显示前一天）
+const fmtLocalDate = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const today = computed(() => fmtLocalDate(new Date()))
 const maxDate = computed(() => {
   const d = new Date(); d.setDate(d.getDate() + 14)
-  return d.toISOString().slice(0, 10)
+  return fmtLocalDate(d)
 })
 const departureDate = ref(today.value)
 const dateOptions = computed(() => {
@@ -214,7 +221,7 @@ const dateOptions = computed(() => {
   const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
   for (let i = 0; i < 15; i++) {
     const d = new Date(); d.setDate(d.getDate() + i)
-    const v = d.toISOString().slice(0, 10)
+    const v = fmtLocalDate(d)
     const label = i === 0 ? '今天' : i === 1 ? '明天' : weekdays[d.getDay()]
     const sub = `${d.getMonth() + 1}/${d.getDate()}`
     opts.push({ value: v, label, sub })
