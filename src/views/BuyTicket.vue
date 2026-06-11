@@ -87,11 +87,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
 import { getPassengerList, searchTickets, buyTicket } from '@/api'
 
 const route = useRoute()
+const router = useRouter()
 
 const passengers = ref([])
 const selectedIds = ref([])
@@ -161,7 +162,7 @@ async function handleBuy() {
     })
     if (res.success) {
       const orderSn = res.data?.orderSn || res.data
-      window.location.href = `/#/order?orderSn=${orderSn}`
+      router.push({ name: 'order', query: { orderSn } })
     } else {
       buyError.value = res.message || '购票失败'
     }
