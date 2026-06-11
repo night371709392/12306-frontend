@@ -36,3 +36,4 @@ export const getMyTickets = params => http.get('/order-service/order/ticket/self
 // ── Pay ──
 export const createPay = data => http.post('/pay-service/pay/create', data)
 export const getPayStatus = params => http.get('/pay-service/pay/query/order-sn', { params })
+export const wechatPaySuccess = params => http.post('/pay-service/pay/wechat/success', null, { params })

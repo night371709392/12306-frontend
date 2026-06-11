@@ -97,7 +97,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
-import { getOrderBySn, cancelTicket, createPay, getPayStatus } from '@/api'
+import { getOrderBySn, cancelTicket, createPay, getPayStatus, wechatPaySuccess } from '@/api'
 
 const route = useRoute()
 
@@ -179,6 +179,24 @@ async function handleCancel() {
 async function doPay() {
   paying.value = true
   try {
+    // 微信支付：项目未对接真实微信渠道，调用后端模拟支付成功接口完成真实状态流转
+    if (payChannel.value === 1) {
+      const payload = {
+        channel: 0,
+        tradeType: 0,
+        orderSn: order.value.orderSn,
+        totalAmount: totalAmountFen.value,
+        outOrderSn: order.value.orderSn,
+        subject: '12306火车票'
+      }
+      await createPay(payload)
+      const wxRes = await wechatPaySuccess({ orderSn: order.value.orderSn })
+      if (wxRes.success) {
+        order.value.status = 10
+        showPayModal.value = false
+      }
+      return
+    }
     const res = await createPay({
       channel: payChannel.value,
       tradeType: 0,
