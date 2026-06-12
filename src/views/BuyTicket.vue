@@ -61,19 +61,44 @@
       <!-- Seat selection -->
       <section class="section" v-if="selectedIds.length && showSeatGrid">
         <h3 class="section-title">选择座位</h3>
-        <p class="dim" style="font-size:0.72rem;margin-bottom:var(--s-md)">可选座位，也可跳过直接购票</p>
-        <div class="seat-grid">
-          <template v-for="row in ['A','B','C','D','F']" :key="row">
-            <div
-              v-for="col in 4"
-              :key="row+col"
-              :class="['seat-grid__cell', { 'seat-grid__cell--selected': chooseSeats.includes(row+col), 'seat-grid__cell--aisle': row === 'C' }]"
-              @click="toggleSeat(row+col)"
-            >{{ row }}</div>
-          </template>
+        <p class="dim" style="font-size:0.72rem;margin-bottom:var(--s-md)">
+          最多可选 {{ selectedIds.length }} 个座位（已选 {{ chooseSeats.length }}），也可跳过由系统分配
+        </p>
+
+        <div class="carriage">
+          <!-- Column headers: A B C [aisle] D F -->
+          <div class="carriage__head">
+            <span class="carriage__rownum"></span>
+            <span class="carriage__col">A</span>
+            <span class="carriage__col">B</span>
+            <span class="carriage__col">C</span>
+            <span class="carriage__aisle">过道</span>
+            <span class="carriage__col">D</span>
+            <span class="carriage__col">F</span>
+          </div>
+
+          <!-- Seat rows -->
+          <div v-for="r in seatRows" :key="r" class="carriage__row">
+            <span class="carriage__rownum">{{ r }}</span>
+            <template v-for="letter in seatCols" :key="letter">
+              <span v-if="letter === '|'" class="carriage__aisle-gap"></span>
+              <button
+                v-else
+                type="button"
+                :class="['seat', {
+                  'seat--selected': chooseSeats.includes(letter + r),
+                  'seat--disabled': !chooseSeats.includes(letter + r) && chooseSeats.length >= selectedIds.length
+                }]"
+                @click="toggleSeat(letter + r)"
+              >{{ letter }}</button>
+            </template>
+          </div>
         </div>
+
+        <!-- Legend -->
         <div class="seat-legend">
-          <span>窗</span><span>A</span><span>B</span><span>C</span><span>过道</span><span>D</span><span>F</span><span>窗</span>
+          <span class="seat-legend__item"><i class="seat-legend__box seat-legend__box--free"></i>可选</span>
+          <span class="seat-legend__item"><i class="seat-legend__box seat-legend__box--sel"></i>已选</span>
         </div>
       </section>
 
@@ -106,6 +131,10 @@ const buyError = ref('')
 const availSeats = ref([])
 
 const seatMap = { 0:'商务座',1:'一等座',2:'二等座',3:'动卧',4:'高级软卧',5:'一等卧',6:'二等卧',7:'软座',8:'硬座',9:'无座',10:'其他',13:'软卧' }
+
+// 12306 二等座车厢布局：每排 A B C [过道] D F（无 E 列，与飞机一致）
+const seatRows = Array.from({ length: 10 }, (_, i) => i + 1)
+const seatCols = ['A', 'B', 'C', '|', 'D', 'F']
 
 onMounted(async () => {
   try {
@@ -140,8 +169,13 @@ function togglePassenger(id) {
 
 function toggleSeat(s) {
   const idx = chooseSeats.value.indexOf(s)
-  if (idx >= 0) chooseSeats.value.splice(idx, 1)
-  else chooseSeats.value.push(s)
+  if (idx >= 0) {
+    chooseSeats.value.splice(idx, 1)
+  } else {
+    // 最多只能选与乘车人数量相同的座位
+    if (chooseSeats.value.length >= selectedIds.value.length) return
+    chooseSeats.value.push(s)
+  }
 }
 
 async function handleBuy() {
@@ -202,13 +236,83 @@ async function handleBuy() {
 .passenger-item__opts { display: flex; gap: var(--s-sm); }
 .mini-select { padding: 4px 8px; font-size: 0.75rem; border-radius: var(--r-sm); background: var(--c-bg); border: 1px solid var(--c-border); color: var(--c-text); }
 
-/* Seat grid */
-.seat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s-sm); max-width: 340px; margin-bottom: var(--s-sm); }
-.seat-grid__cell { padding: 10px; text-align: center; border: 1px solid var(--c-border); border-radius: var(--r-sm); font-size: 0.75rem; cursor: pointer; transition: all var(--dur-fast); }
-.seat-grid__cell:hover { border-color: var(--c-slate); }
-.seat-grid__cell--selected { background: var(--c-slate); color: var(--c-bg); border-color: var(--c-slate); }
-.seat-grid__cell--aisle { margin-right: var(--s-md); }
-.seat-legend { display: flex; gap: var(--s-xs); font-size: 0.65rem; color: var(--c-text-muted); max-width: 340px; justify-content: space-between; }
+/* Seat selection — 12306 二等座车厢样式 */
+.carriage {
+  max-width: 320px;
+  padding: var(--s-md);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-bg-raised, rgba(255,255,255,0.02));
+  margin-bottom: var(--s-md);
+}
+.carriage__head,
+.carriage__row {
+  display: grid;
+  grid-template-columns: 28px repeat(3, 1fr) 22px repeat(2, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.carriage__head { margin-bottom: var(--s-sm); }
+.carriage__row { margin-bottom: 6px; }
+.carriage__col,
+.carriage__aisle {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--c-text-muted);
+}
+.carriage__rownum {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--c-text-muted);
+}
+.carriage__aisle-gap { width: 22px; }
+
+/* 单个座位：模拟座椅外形 */
+.seat {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--c-text);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border-lt, var(--c-border));
+  border-radius: 4px 4px 7px 7px;
+  border-bottom-width: 3px;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  padding: 0;
+}
+.seat:hover { border-color: var(--c-slate); color: var(--c-white); }
+.seat--selected {
+  background: var(--c-slate);
+  color: var(--c-bg);
+  border-color: var(--c-slate);
+}
+.seat--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.seat-legend {
+  display: flex;
+  gap: var(--s-lg);
+  font-size: 0.7rem;
+  color: var(--c-text-muted);
+  align-items: center;
+}
+.seat-legend__item { display: flex; align-items: center; gap: 6px; }
+.seat-legend__box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px 3px 5px 5px;
+  border: 1px solid var(--c-border-lt, var(--c-border));
+  border-bottom-width: 2px;
+  display: inline-block;
+}
+.seat-legend__box--free { background: var(--c-bg); }
+.seat-legend__box--sel { background: var(--c-slate); border-color: var(--c-slate); }
 
 .submit-btn { width: 100%; padding: var(--s-md); background: var(--c-white); color: var(--c-bg); border: none; border-radius: var(--r-md); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; transition: all var(--dur-fast); margin-top: var(--s-lg); }
 .submit-btn:hover { opacity: 0.85; }
