@@ -2,7 +2,7 @@
   <AppLayout>
     <div class="page">
       <div class="buy-header">
-        <button class="back-btn" @click="window.close()">← 返回</button>
+        <button class="back-btn" @click="goBack">← 返回</button>
         <h2>确认订单</h2>
       </div>
 
@@ -86,10 +86,12 @@
                 v-else
                 type="button"
                 :class="['seat', {
-                  'seat--selected': chooseSeats.includes(letter + r),
-                  'seat--disabled': !chooseSeats.includes(letter + r) && chooseSeats.length >= selectedIds.length
+                  'seat--selected': chooseSeats.includes(seatCode(letter, r)),
+                  'seat--occupied': occupiedSeats.has(seatCode(letter, r)),
+                  'seat--disabled': !chooseSeats.includes(seatCode(letter, r)) && !occupiedSeats.has(seatCode(letter, r)) && chooseSeats.length >= selectedIds.length
                 }]"
-                @click="toggleSeat(letter + r)"
+                :disabled="occupiedSeats.has(seatCode(letter, r))"
+                @click="toggleSeat(seatCode(letter, r))"
               >{{ letter }}</button>
             </template>
           </div>
@@ -99,6 +101,7 @@
         <div class="seat-legend">
           <span class="seat-legend__item"><i class="seat-legend__box seat-legend__box--free"></i>可选</span>
           <span class="seat-legend__item"><i class="seat-legend__box seat-legend__box--sel"></i>已选</span>
+          <span class="seat-legend__item"><i class="seat-legend__box seat-legend__box--occ"></i>已售</span>
         </div>
       </section>
 
@@ -114,7 +117,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/AppLayout.vue'
-import { getPassengerList, searchTickets, buyTicket } from '@/api'
+import { getPassengerList, searchTickets, buyTicket, getOrderPage } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -129,12 +132,20 @@ const buying = ref(false)
 const buyError = ref('')
 
 const availSeats = ref([])
+// 该车次已被占用的座位号集合（如 "06A"），用于在选座图标灰
+const occupiedSeats = ref(new Set())
 
 const seatMap = { 0:'商务座',1:'一等座',2:'二等座',3:'动卧',4:'高级软卧',5:'一等卧',6:'二等卧',7:'软座',8:'硬座',9:'无座',10:'其他',13:'软卧' }
 
-// 12306 二等座车厢布局：每排 A B C [过道] D F（无 E 列，与飞机一致）
+// 二等座布局：每排 A B C [过道] D F（无 E 列，与飞机一致）
 const seatRows = Array.from({ length: 10 }, (_, i) => i + 1)
 const seatCols = ['A', 'B', 'C', '|', 'D', 'F']
+
+// 返回上一页（来自查票结果页）；无历史则回查票页
+function goBack() {
+  if (window.history.length > 1) router.back()
+  else router.push({ name: 'ticketSearch' })
+}
 
 onMounted(async () => {
   try {
@@ -152,7 +163,35 @@ onMounted(async () => {
       if (train) availSeats.value = train.seatClassList.filter(s => s.quantity > 0)
     }
   } catch {}
+  loadOccupiedSeats()
 })
+
+// 查询当前账号在该车次已购的订单，把这些座位号标为已占用。
+// 注：后端无"查全车占座"接口，纯前端只能反映本账号买过的座位。
+async function loadOccupiedSeats() {
+  const userId = sessionStorage.getItem('userId')
+  if (!userId) return
+  try {
+    const occupied = new Set()
+    // 0=未支付 1=未出行 2=历史，全部扫一遍
+    for (const statusType of [0, 1, 2]) {
+      const res = await getOrderPage({ userId, current: 1, size: 100, statusType })
+      if (!res.success || !res.data) continue
+      for (const o of (res.data.records || [])) {
+        if (String(o.trainId) !== String(route.query.trainId)) continue
+        for (const p of (o.passengerDetails || [])) {
+          if (p.seatNumber) occupied.add(p.seatNumber)
+        }
+      }
+    }
+    occupiedSeats.value = occupied
+  } catch {}
+}
+
+// 生成与后端一致的座位号：排号补零两位 + 字母（如 6+A => "06A"）
+function seatCode(letter, row) {
+  return String(row).padStart(2, '0') + letter
+}
 
 function togglePassenger(id) {
   const idx = selectedIds.value.indexOf(id)
@@ -168,6 +207,7 @@ function togglePassenger(id) {
 }
 
 function toggleSeat(s) {
+  if (occupiedSeats.value.has(s)) return // 已占用座位不可选
   const idx = chooseSeats.value.indexOf(s)
   if (idx >= 0) {
     chooseSeats.value.splice(idx, 1)
@@ -294,6 +334,19 @@ async function handleBuy() {
   cursor: not-allowed;
   pointer-events: none;
 }
+/* 已售座位：橙红色实心，不可点 */
+.seat--occupied {
+  background: var(--c-err, #c0392b);
+  color: #fff;
+  border-color: var(--c-err, #c0392b);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+.seat--occupied:hover {
+  background: var(--c-err, #c0392b);
+  color: #fff;
+  border-color: var(--c-err, #c0392b);
+}
 
 .seat-legend {
   display: flex;
@@ -313,6 +366,7 @@ async function handleBuy() {
 }
 .seat-legend__box--free { background: var(--c-bg); }
 .seat-legend__box--sel { background: var(--c-slate); border-color: var(--c-slate); }
+.seat-legend__box--occ { background: var(--c-err, #c0392b); border-color: var(--c-err, #c0392b); }
 
 .submit-btn { width: 100%; padding: var(--s-md); background: var(--c-white); color: var(--c-bg); border: none; border-radius: var(--r-md); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; transition: all var(--dur-fast); margin-top: var(--s-lg); }
 .submit-btn:hover { opacity: 0.85; }
