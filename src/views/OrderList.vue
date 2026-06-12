@@ -81,7 +81,7 @@ const page = ref(1)
 const pageSize = 10
 const total = ref(0)
 
-const statusMap = { 0:'待支付', 10:'已支付', 20:'已进站', 30:'已取消', 40:'已退票', 50:'已改签' }
+const statusMap = { 0:'待支付', 10:'已支付', 11:'部分退款', 12:'已退款', 20:'已进站', 30:'已取消', 40:'已退票', 50:'已改签' }
 function statusClass(s) {
   if (s === 0) return 'status-tag--amber'
   if (s === 10) return 'status-tag--green'
@@ -119,8 +119,11 @@ async function cancelOrder(o) {
 async function refundOrder(o) {
   if (!confirm('确认退票？')) return
   try {
-    await refundTicket({ orderSn: o.orderSn, type: 0, subOrderRecordIdReqList: [] })
-    o.status = 40
+    // 整单退票：type=1 表示全部退款，后端退款成功后通过 MQ 将订单状态流转为 12(已退款)
+    const res = await refundTicket({ orderSn: o.orderSn, type: 1, subOrderRecordIdReqList: [] })
+    if (res.success) {
+      o.status = 12
+    }
   } catch {}
 }
 
